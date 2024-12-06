@@ -130,16 +130,16 @@ BlockHeader TaskGenerator::generateTask(const std::string &previousHash, uint32_
 
 int main()
 {
-    std::string previousHash = getBestBlockHash();
+    // std::string previousHash = getBestBlockHash();
 
-    BlockGenerator blockGenerator(previousHash);
-    BlockHeader newBlock = blockGenerator.generateBlock();
+    // BlockGenerator blockGenerator(previousHash);
+    // BlockHeader newBlock = blockGenerator.generateBlock();
 
-    std::cout << "\nNew Block Generated:\n";
-    std::cout << "Previous Hash: " << newBlock.previousHash << "\n";
-    std::cout << "Merkle Root: " << newBlock.merkleRoot << "\n";
-    std::cout << "Timestamp: " << newBlock.timestamp << "\n";
-    std::cout << "Nonce: " << newBlock.nonce << "\n";
+    // std::cout << "\nNew Block Generated:\n";
+    // std::cout << "Previous Hash: " << newBlock.previousHash << "\n";
+    // std::cout << "Merkle Root: " << newBlock.merkleRoot << "\n";
+    // std::cout << "Timestamp: " << newBlock.timestamp << "\n";
+    // std::cout << "Nonce: " << newBlock.nonce << "\n";
 
     return 0;
 }

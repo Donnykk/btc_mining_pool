@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     '/Users/donny/Desktop/mining_pool/block_gen'
-relocations:     []
-...
