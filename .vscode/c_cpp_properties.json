@@ -4,7 +4,8 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/opt/homebrew/opt/openssl/include"
+                "/opt/homebrew/opt/openssl/include",
+                "/opt/homebrew/opt/jsoncpp/include"
             ],
             "defines": [],
             "macFrameworkPath": [
