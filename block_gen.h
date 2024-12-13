@@ -36,17 +36,18 @@ struct BlockHeader
 class BlockGenerator
 {
 public:
-    BlockGenerator(const std::string &previousHash);
+    BlockGenerator(const std::string &previousHash, const double difficulty);
     BlockHeader generateBlock();
 
 private:
     std::string previousHash;
+    double difficulty;
 };
 
 class TaskGenerator
 {
 public:
-    BlockHeader generateTask(const std::string &previousHash, uint32_t difficultyTarget);
+    BlockHeader generateTask(const std::string &previousHash, double difficultyTarget);
 };
 
 #endif // BLOCK_GEN_H
