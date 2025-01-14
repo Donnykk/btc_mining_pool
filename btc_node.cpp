@@ -1,6 +1,8 @@
 #include "btc_node.h"
 #include <iostream>
 #include <sstream>
+#include <thread>
+#include <chrono>
 
 BTC_Node::BTC_Node() {}
 
@@ -118,5 +120,26 @@ void BTC_Node::parseAndPrintBlockInfo(const std::string &response)
     else
     {
         std::cerr << "Failed to parse JSON response: " << errs << std::endl;
+    }
+}
+
+void BTC_Node::startPoll(int intervalSeconds)
+{
+    while (true)
+    {
+        std::string rpcUrl = "https://go.getblock.io/fac1ed1394ed48e7b09e81bf7ddd4f86";
+
+        std::cout << "Polling blockchain info every " << intervalSeconds << " seconds..." << std::endl;
+
+        // Create JSON-RPC payload
+        std::string payload = createGetBlockPayload();
+
+        // Send request and parse response
+        std::string response = sendJsonRpcRequest(rpcUrl, payload);
+
+        parseAndPrintBlockInfo(response);
+
+        // Wait for the next polling interval
+        std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
     }
 }

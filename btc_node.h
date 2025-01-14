@@ -26,17 +26,20 @@ public:
     void setBlockHeight(int height);
     void setDifficulty(double diff);
 
-    // Function to write the response data into a string
+    // Write the response data into a string
     static size_t WriteCallback(void *contents, size_t size, size_t nmemb, std::string *response);
 
-    // Function to create JSON-RPC payload
+    // Create JSON-RPC payload
     std::string createGetBlockPayload();
 
-    // Function to send JSON-RPC request
+    // Send JSON-RPC request
     std::string sendJsonRpcRequest(const std::string &url, const std::string &payload);
 
-    // Function to parse and print block information
+    // Parse and print block information
     void parseAndPrintBlockInfo(const std::string &response);
+
+    // Poll to get new block
+    void startPoll(int intervalSeconds);
 };
 
 #endif // BTC_NODE_H

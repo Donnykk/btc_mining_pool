@@ -5,7 +5,10 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/opt/homebrew/opt/openssl/include",
-                "/opt/homebrew/opt/jsoncpp/include"
+                "/opt/homebrew/opt/jsoncpp/include",
+                "/opt/homebrew/opt/librdkafka/include",
+                "/opt/homebrew/opt/glog/include",
+                "/opt/homebrew/opt/gflags/include"
             ],
             "defines": [],
             "macFrameworkPath": [

@@ -7,6 +7,7 @@
 #include <openssl/sha.h>
 #include <curl/curl.h>
 #include <ctime>
+#include "kafka_server.h"
 
 // Get transactions
 std::vector<std::string> getTransactions();
@@ -19,9 +20,6 @@ std::string calculateMerkleRoot(const std::vector<std::string> &transactions);
 
 // Fetch the latest block hash
 std::string getBestBlockHash();
-
-// Fetch the current difficulty target
-uint32_t getDifficultyTarget();
 
 struct BlockHeader
 {
@@ -37,17 +35,11 @@ class BlockGenerator
 {
 public:
     BlockGenerator(const std::string &previousHash, const double difficulty);
-    BlockHeader generateBlock();
+    // BlockHeader generateBlock();
 
 private:
     std::string previousHash;
     double difficulty;
-};
-
-class TaskGenerator
-{
-public:
-    BlockHeader generateTask(const std::string &previousHash, double difficultyTarget);
 };
 
 #endif // BLOCK_GEN_H

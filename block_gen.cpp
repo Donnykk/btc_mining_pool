@@ -24,38 +24,6 @@ std::string sha256(const std::string &data)
     return std::string(hexStr);
 }
 
-std::string toHexString(uint64_t number, int totalBits)
-{
-    std::ostringstream oss;
-    oss << std::hex << number;
-    std::string hexString = oss.str();
-    while (hexString.length() < totalBits / 4)
-    {
-        hexString = "0" + hexString;
-    }
-    return hexString;
-}
-
-// Calculate Difficulty Target
-int calculateDifficultyTarget(double difficulty)
-{
-    // Maximum target (difficulty = 1)
-    const uint64_t maxTargetHigh = 0xFFFF;
-    const int shiftBits = 208;
-    double currentTarget = (maxTargetHigh * std::pow(2, shiftBits)) / difficulty;
-    // Convert current target to binary string
-    std::string hexTarget = toHexString(static_cast<uint64_t>(currentTarget), 256);
-    int leadingZeros = 0;
-    for (char c : hexTarget)
-    {
-        if (c == '0')
-            leadingZeros++;
-        else
-            break;
-    }
-    return leadingZeros / 10;
-}
-
 // Merkle Root
 std::string calculateMerkleRoot(const std::vector<std::string> &transactions)
 {
@@ -119,37 +87,6 @@ std::string BlockHeader::toString() const
 BlockGenerator::BlockGenerator(const std::string &previousHash, const double difficulty) : previousHash(previousHash), difficulty(difficulty) {}
 
 // BlockGenerator method implementation
-BlockHeader BlockGenerator::generateBlock()
-{
-    // Generate mining task using TaskGenerator
-    TaskGenerator taskGenerator;
-    BlockHeader blockHeader = taskGenerator.generateTask(previousHash, difficulty);
-
-    // TODO：Allocate to miners
-    std::string targetPrefix(blockHeader.difficultyTarget, '0');
-    std::cout << "DifficultyTarget: " << blockHeader.difficultyTarget << std::endl;
-    while (true)
-    {
-        std::string blockHash = sha256(blockHeader.toString());
-        if (blockHash.substr(0, blockHeader.difficultyTarget) == targetPrefix)
-        {
-            std::cout << "Found valid nonce: " << blockHeader.nonce << "\n";
-            std::cout << "Block Hash: " << blockHash << "\n";
-            break;
-        }
-        blockHeader.nonce++;
-    }
-    return blockHeader;
-}
-
-BlockHeader TaskGenerator::generateTask(const std::string &previousHash, double difficulty)
-{
-    BlockHeader blockHeader;
-    blockHeader.previousHash = previousHash;
-    blockHeader.timestamp = static_cast<uint32_t>(time(nullptr));
-    blockHeader.nonce = 0;
-    blockHeader.difficultyTarget = calculateDifficultyTarget(difficulty);
-    std::vector<std::string> transactions = getTransactions();
-    blockHeader.merkleRoot = calculateMerkleRoot(transactions);
-    return blockHeader;
-}
+// BlockHeader BlockGenerator::generateBlock()
+// {
+// }
