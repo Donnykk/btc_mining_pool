@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <netinet/in.h>
 #include <mysql/mysql.h>
+#include <sqlite3.h>
 
 class Miner
 {
@@ -28,8 +29,7 @@ private:
 class MinerManager
 {
 public:
-    MinerManager(const std::string &dbHost, const std::string &dbUser, const std::string &dbPassword, const std::string &dbName);
-
+    MinerManager(const std::string &dbPath);
     bool registerMiner(const std::string &username, const std::string &password, const std::string &address);
     bool connectMiner(const std::string &username, const std::string &password);
 
@@ -37,7 +37,7 @@ private:
     std::unordered_map<std::string, Miner> miners_;
     std::mutex mutex_;
 
-    MYSQL *db_;
+    sqlite3 *db_;
     bool initDatabase();
 };
 
@@ -64,6 +64,7 @@ protected:
     std::string dbUser = "root";
     std::string dbPassword = "root";
     std::string dbName = "Mining_Pool";
+    std::string dbPath = "mining_pool.db";
 
     virtual void handleClient(int clientSocket);
 

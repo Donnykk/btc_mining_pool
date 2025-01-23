@@ -6,7 +6,8 @@ CXXFLAGS = -std=c++14 -g \
 		-I/opt/homebrew/opt/librdkafka/include \
 		-I/opt/homebrew/opt/glog/include \
 		-I/opt/homebrew/opt/gflags/include \
-		-I/opt/homebrew/opt/mysql/include
+		-I/opt/homebrew/opt/mysql/include \
+		-I./src
 
 LDFLAGS = -L/opt/homebrew/opt/jsoncpp/lib \
 		-L/opt/homebrew/opt/openssl/lib \
@@ -17,12 +18,12 @@ LDFLAGS = -L/opt/homebrew/opt/jsoncpp/lib \
 		-ljsoncpp -lcurl -lssl -lcrypto -lrdkafka -lglog -lgflags -lmysqlclient
 
 # Source Files
-SRCS = $(wildcard *.cpp)
+SRCS = $(wildcard src/*.cpp)
 # Object Files (replace .cpp with .o)
-OBJS = $(SRCS:.cpp=.o)
+OBJS = $(SRCS:src/%.cpp=obj/%.o)
 
 # Target Executable
-TARGET = test
+TARGET = test_server
 
 # Build Rules
 all: $(TARGET)

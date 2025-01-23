@@ -26,13 +26,16 @@ bool Miner::verifyPwd(const std::string &password) const
     return password_ == password;
 }
 
-MinerManager::MinerManager(const std::string &dbHost, const std::string &dbUser, const std::string &dbPassword, const std::string &dbName)
-    : db_(mysql_init(nullptr))
+MinerManager::MinerManager(const std::string &dbPath)
 {
-    if (!mysql_real_connect(db_, dbHost.c_str(), dbUser.c_str(), dbPassword.c_str(), dbName.c_str(), 3306, nullptr, 0))
+    int result = sqlite3_open(dbPath.c_str(), &db_);
+}
+
+MinerManager::~MinerManager()
+{
+    if (db_)
     {
-        std::cerr << "Failed to connect to MySQL: " << mysql_error(db_) << std::endl;
-        exit(EXIT_FAILURE);
+        sqlite3_close(db_);
     }
 }
 
@@ -40,16 +43,19 @@ bool MinerManager::initDatabase()
 {
     const char *createTableSQL =
         "CREATE TABLE IF NOT EXISTS Miner ("
-        "id INT AUTO_INCREMENT PRIMARY KEY, "
-        "Username VARCHAR(255) UNIQUE NOT NULL, "
-        "Password VARCHAR(255) NOT NULL, "
-        "Address VARCHAR(255) NOT NULL,"
-        "Status ENUM('online', 'offline') DEFAULT 'offline',"
-        "LastSeen TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;";
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "Username TEXT UNIQUE NOT NULL, "
+        "Password TEXT NOT NULL, "
+        "Address TEXT NOT NULL, "
+        "Status TEXT DEFAULT 'offline', "
+        "LastSeen TIMESTAMP DEFAULT CURRENT_TIMESTAMP);";
 
-    if (mysql_query(db_, createTableSQL))
+    char *errMsg = nullptr;
+    int result = sqlite3_exec(db_, createTableSQL, nullptr, nullptr, &errMsg);
+    if (result != SQLITE_OK)
     {
-        std::cerr << "Failed to create table: " << mysql_error(db_) << std::endl;
+        std::cerr << "Failed to create table: " << errMsg << std::endl;
+        sqlite3_free(errMsg);
         return false;
     }
     return true;
@@ -57,67 +63,85 @@ bool MinerManager::initDatabase()
 
 bool MinerManager::registerMiner(const std::string &username, const std::string &password, const std::string &address)
 {
-    if (!db_)
-    {
-        std::cerr << "Database connection is not established." << std::endl;
-        return false;
-    }
-    std::string query = "INSERT INTO Miner (Username, Password, Address) VALUES ('" +
-                        username + "', '" + password + "', '" + address + "');";
-
     std::lock_guard<std::mutex> lock(mutex_);
+
     if (miners_.find(username) != miners_.end())
     {
         std::cerr << "Miner " << username << " is already registered." << std::endl;
         return false;
     }
-    if (!mysql_query(db_, query.c_str()))
+
+    const char *insertSQL = "INSERT INTO Miner (Username, Password, Address) VALUES (?, ?, ?);";
+    sqlite3_stmt *stmt;
+    int result = sqlite3_prepare_v2(db_, insertSQL, -1, &stmt, nullptr);
+    if (result != SQLITE_OK)
     {
-        // Success if mysql_query returns 0
-        std::cerr << "Failed to insert miner: " << mysql_error(db_) << std::endl;
+        std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db_) << std::endl;
         return false;
     }
+
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, password.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, address.c_str(), -1, SQLITE_STATIC);
+
+    result = sqlite3_step(stmt);
+    if (result != SQLITE_DONE)
+    {
+        std::cerr << "Failed to insert miner: " << sqlite3_errmsg(db_) << std::endl;
+        sqlite3_finalize(stmt);
+        return false;
+    }
+
+    sqlite3_finalize(stmt);
     std::cout << "Miner " << username << " registered successfully." << std::endl;
     return true;
 }
 
 bool MinerManager::connectMiner(const std::string &username, const std::string &password)
 {
-    if (!db_)
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    const char *selectSQL = "SELECT Username, Password, Address FROM Miner WHERE Username = ?;";
+    sqlite3_stmt *stmt;
+    int result = sqlite3_prepare_v2(db_, selectSQL, -1, &stmt, nullptr);
+    if (result != SQLITE_OK)
     {
-        std::cerr << "Database connection is not established." << std::endl;
+        std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db_) << std::endl;
         return false;
     }
 
-    std::string query = "SELECT Username, Password, Address FROM Miner WHERE Username = '" + username + "' ;";
-    if (mysql_query(db_, query.c_str()))
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
+
+    result = sqlite3_step(stmt);
+    if (result != SQLITE_ROW)
     {
-        std::cerr << "Failed to execute query: " << mysql_error(db_) << std::endl;
+        std::cerr << "User not registered!" << std::endl;
+        sqlite3_finalize(stmt);
         return false;
     }
-    MYSQL_RES *result = mysql_store_result(db_);
-    MYSQL_ROW row = mysql_fetch_row(result);
-    if (row == nullptr)
-    {
-        std::cerr << "User not regitered!" << std::endl;
-        return false;
-    }
-    std::string loadedUsername = row[0];
-    std::string loadedPassword = row[1];
-    std::string loadedAddress = row[2];
+
+    std::string loadedUsername = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+    std::string loadedPassword = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+    std::string loadedAddress = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
 
     Miner miner(loadedUsername, loadedPassword, loadedAddress);
     if (!miner.verifyPwd(password))
     {
         std::cerr << "Wrong Password!" << std::endl;
+        sqlite3_finalize(stmt);
         return false;
     }
-    miners_.emplace(loadedAddress, Miner(loadedUsername, loadedPassword, loadedAddress));
+
+    miners_.emplace(loadedAddress, miner);
+    sqlite3_finalize(stmt);
     return true;
 }
 
 TCPServer::TCPServer(int port)
-    : port_(port), serverSocket_(-1), isRunning_(false) {}
+    : port_(port), serverSocket_(-1), isRunning_(false)
+{
+    dbPath = "mining_pool.db";
+}
 
 TCPServer::~TCPServer()
 {

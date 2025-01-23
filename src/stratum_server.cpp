@@ -97,7 +97,6 @@ void StratumServer::handleMiningNotify(int clientSocket)
             true
         ]
     })";
-
     sendMessage(clientSocket, notifyMessage);
 }
 
