@@ -10,37 +10,6 @@
 #include <mysql/mysql.h>
 #include <sqlite3.h>
 
-class Miner
-{
-public:
-    Miner(const std::string &username, const std::string &password, const std::string &address);
-
-    std::string getUsername() const;
-    std::string getAddress() const;
-
-    bool verifyPwd(const std::string &password) const;
-
-private:
-    std::string username_;
-    std::string password_;
-    std::string address_;
-};
-
-class MinerManager
-{
-public:
-    MinerManager(const std::string &dbPath);
-    bool registerMiner(const std::string &username, const std::string &password, const std::string &address);
-    bool connectMiner(const std::string &username, const std::string &password);
-
-private:
-    std::unordered_map<std::string, Miner> miners_;
-    std::mutex mutex_;
-
-    sqlite3 *db_;
-    bool initDatabase();
-};
-
 class TCPServer
 {
 public:

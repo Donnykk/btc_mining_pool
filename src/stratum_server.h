@@ -6,6 +6,38 @@
 #include <string>
 #include <json/json.h>
 
+class Miner
+{
+public:
+    Miner(const std::string &username, const std::string &password, const std::string &address);
+
+    std::string getUsername() const;
+    std::string getAddress() const;
+
+    bool verifyPwd(const std::string &password) const;
+
+private:
+    std::string username_;
+    std::string password_;
+    std::string address_;
+};
+
+class MinerManager
+{
+public:
+    MinerManager(const std::string &dbPath);
+    ~MinerManager();
+    bool registerMiner(const std::string &username, const std::string &password, const std::string &address);
+    bool connectMiner(const std::string &username, const std::string &password);
+
+private:
+    std::unordered_map<std::string, Miner> miners_;
+    std::mutex mutex_;
+
+    sqlite3 *db_;
+    bool initDatabase();
+};
+
 class StratumServer : public TCPServer
 {
 public:
@@ -23,10 +55,10 @@ private:
     void processStratumMessage(int clientSocket, const std::string &message);
 
     // Handle specific Stratum methods
+    void handleMiningSubscribe(int clientSocket, const Json::Value &reqId);
+    void handleMiningAuthorize(int clientSocket, const Json::Value &reqId, const Json::Value &params);
     void handleMiningNotify(int clientSocket);
-    void handleMiningSubmit(int clientSocket, const Json::Value &params);
-    void handleMiningAuthorize(int clientSocket, const Json::Value &params);
-    void handleMiningSubscribe(int clientSocket);
+    void handleMiningSubmit(int clientSocket, const Json::Value &reqId, const Json::Value &params);
 };
 
 #endif // STRATUM_SERVER_H

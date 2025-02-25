@@ -15,7 +15,7 @@ LDFLAGS = -L/opt/homebrew/opt/jsoncpp/lib \
 		-L/opt/homebrew/opt/glog/lib \
 		-L/opt/homebrew/opt/gflags/lib \
 		-L/opt/homebrew/opt/mysql/lib \
-		-ljsoncpp -lcurl -lssl -lcrypto -lrdkafka -lglog -lgflags -lmysqlclient
+		-ljsoncpp -lcurl -lssl -lcrypto -lrdkafka -lglog -lgflags -lmysqlclient -lsqlite3
 
 # Source Files
 SRCS = $(wildcard src/*.cpp)
@@ -23,7 +23,7 @@ SRCS = $(wildcard src/*.cpp)
 OBJS = $(SRCS:src/%.cpp=obj/%.o)
 
 # Target Executable
-TARGET = test_server
+TARGET = main
 
 # Build Rules
 all: $(TARGET)
@@ -31,7 +31,7 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-%.o: %.cpp
+obj/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Run the application
