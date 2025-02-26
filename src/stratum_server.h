@@ -57,6 +57,7 @@ private:
     // Handle specific Stratum methods
     void handleMiningSubscribe(int clientSocket, const Json::Value &reqId);
     void handleMiningAuthorize(int clientSocket, const Json::Value &reqId, const Json::Value &params);
+    void handleMiningExtranonceSubscribe(int clientSocket, const Json::Value &reqId);
     void handleMiningNotify(int clientSocket);
     void handleMiningSubmit(int clientSocket, const Json::Value &reqId, const Json::Value &params);
 };

@@ -199,6 +199,10 @@ void StratumServer::processStratumMessage(int clientSocket, const std::string &m
     {
         handleMiningAuthorize(clientSocket, root["id"], root["params"]);
     }
+    else if (method == "mining.extranonce.subscribe")
+    {
+        handleMiningExtranonceSubscribe(clientSocket, root["id"]);
+    }
     else if (method == "mining.notify")
     {
         handleMiningNotify(clientSocket);
@@ -248,39 +252,20 @@ void StratumServer::handleMiningAuthorize(int clientSocket, const Json::Value &r
     std::cout << "Send message: " << response << std::endl;
 }
 
+void StratumServer::handleMiningExtranonceSubscribe(int clientSocket, const Json::Value &reqId)
+{
+    std::ostringstream oss;
+    oss << R"({"id":)" << reqId.asInt() << R"(,"result":true,"error":null})";
+    std::string response = oss.str() + "\n";
+    std::cout << "Sending message: " << response << std::endl;
+    sendMessage(clientSocket, response);
+    std::cout << "Send message: " << response << std::endl;
+    handleMiningNotify(clientSocket);
+}
+
 void StratumServer::handleMiningNotify(int clientSocket)
 {
-    // std::string notifyMessage = R"({
-    //     "id": null,
-    //     "method": "mining.notify",
-    //     "params": [
-    //         "job_id",
-    //         "prevhash",
-    //         "coinb1",
-    //         "coinb2",
-    //         [],
-    //         "version",
-    //         "nbits",
-    //         "ntime",
-    //         true
-    //     ]
-    // })";
-
-    std::string notifyMessage = R"({
-        "id": null,
-        "method": "mining.notify",
-        "params": [
-            "job_2009",                
-            "000000000019d6689c085ae165831e93",  
-            "04ffff001d0104",          
-            "ffffffff",                
-            [],                        
-            "1",                       
-            "1d00ffff",               
-            "1231006505",              
-            true                       
-        ]
-    })";
+    std::string notifyMessage = R"({"id":null,"method":"mining.notify","params":["B8rBfBgte","ca233f5e0d742ae5496c70bca70c29f2fc2e07f1000ccab20000000000000000","01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff64032fa4092cfabe6d6dc5cf100d10589275d705cb97a9bd1538a43aa3d80f79b2cef3df8bae83df9be910000000f09f909f082f4632506f6f6c2f104d696e656420627920676f61746269740000000000000000000000000000000000000005","046df52126000000001976a914c825a1ecf2a6830c4401620c3a16f1995057c2ab88ac00000000000000002f6a24aa21a9edd8b230477653c88496573b58cbaf3a3e9b94967780d2994711ca0351f84dbc3308000000000000000000000000000000002c6a4c2952534b424c4f434b3af8d08fcbbe5d9822db33f13c0eafd3a8346fd816d3a462790c1bbc23002479480000000000000000266a24b9e11b6dba3d0da4b316490cad28b9c143047d53fc9fffb5c6454aad22553bed229f604135512c3a",["cabe23c7b037fdc897f34263599c1955c81ea5eecac3e21b78f5d2b24433333b","b65a061b6b328db86fbba3bbe6fa229700a1bb3386325dff5e1da8abb011b670","1b18a0a020837e44ef5eb2ab72aa1a0fd02c89e5b92cde9efe727e72edee8065"],"20000000","171297f6","5ecdcf8a",true]})";
     notifyMessage += "\n";
     sendMessage(clientSocket, notifyMessage);
     std::cout << "Send message: " << notifyMessage << std::endl;
