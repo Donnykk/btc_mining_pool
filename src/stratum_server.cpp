@@ -5,6 +5,7 @@
 #include <mutex>
 #include <unistd.h>
 #include <unordered_set>
+#include "task_validator.h"
 
 Miner::Miner(const std::string &username, const std::string &password, const std::string &address)
 {
@@ -31,6 +32,17 @@ bool Miner::verifyPwd(const std::string &password) const
 MinerManager::MinerManager(const std::string &dbPath)
 {
     int result = sqlite3_open(dbPath.c_str(), &db_);
+    if (result != SQLITE_OK)
+    {
+        std::cerr << "Could not open database: " << sqlite3_errmsg(db_) << std::endl;
+    }
+    else
+    {
+        if (!initDatabase())
+        {
+            std::cerr << "Failed to initialize database." << std::endl;
+        }
+    }
 }
 
 MinerManager::~MinerManager()
@@ -133,13 +145,58 @@ bool MinerManager::connectMiner(const std::string &username, const std::string &
         sqlite3_finalize(stmt);
         return false;
     }
-
+    const char *updateSQL = "UPDATE Miner SET Status = 'online', LastSeen = CURRENT_TIMESTAMP WHERE Username = ?;";
+    sqlite3_stmt *updateStmt;
+    result = sqlite3_prepare_v2(db_, updateSQL, -1, &updateStmt, nullptr);
+    if (result == SQLITE_OK)
+    {
+        sqlite3_bind_text(updateStmt, 1, username.c_str(), -1, SQLITE_STATIC);
+        sqlite3_step(updateStmt);
+        sqlite3_finalize(updateStmt);
+    }
+    else
+    {
+        std::cerr << "Failed to update miner status: " << sqlite3_errmsg(db_) << std::endl;
+    }
     miners_.emplace(loadedAddress, miner);
     sqlite3_finalize(stmt);
     return true;
 }
 
-StratumServer::StratumServer(int port) : TCPServer(port) {}
+bool MinerManager::disconnectMiner(const std::string &username)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    const char *updateSQL = "UPDATE Miner SET Status = 'offline', LastSeen = CURRENT_TIMESTAMP WHERE Username = ?;";
+    sqlite3_stmt *stmt;
+    int result = sqlite3_prepare_v2(db_, updateSQL, -1, &stmt, nullptr);
+    if (result != SQLITE_OK)
+    {
+        std::cerr << "Failed to prepare disconnect statement: " << sqlite3_errmsg(db_) << std::endl;
+        return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
+    result = sqlite3_step(stmt);
+    if (result != SQLITE_DONE)
+    {
+        std::cerr << "Failed to mark miner offline: " << sqlite3_errmsg(db_) << std::endl;
+        sqlite3_finalize(stmt);
+        return false;
+    }
+    sqlite3_finalize(stmt);
+
+    auto it = miners_.find(username);
+    if (it != miners_.end())
+    {
+        miners_.erase(it);
+    }
+
+    std::cout << "Miner " << username << " marked as offline." << std::endl;
+    return true;
+}
+
+StratumServer::StratumServer(int port) : TCPServer(port), minerManager("mining_pool.db") {}
 
 StratumServer::~StratumServer() {}
 
@@ -160,7 +217,9 @@ void StratumServer::handleClient(int clientSocket)
 
         if (message.empty())
         {
-            std::cout << "Client disconnected." << std::endl;
+            std::string username = "root";
+            std::cout << "Client " << username << " disconnected." << std::endl;
+            minerManager.disconnectMiner(username);
             break;
         }
 
@@ -245,8 +304,17 @@ void StratumServer::handleMiningAuthorize(int clientSocket, const Json::Value &r
 
     std::cout << "Authorizing worker " << username << std::endl;
 
+    bool success = minerManager.connectMiner(username, password);
+
     std::ostringstream oss;
-    oss << R"({"id":)" << reqId.asInt() << R"(,"result":true,"error":null})";
+    if (success)
+    {
+        oss << R"({"id":)" << reqId.asInt() << R"(,"result":true,"error":null})";
+    }
+    else
+    {
+        oss << R"({"id":)" << reqId.asInt() << R"(,"result":false,"error":"Authentication failed"})";
+    }
     std::string response = oss.str() + "\n";
     sendMessage(clientSocket, response);
     std::cout << "Send message: " << response << std::endl;
@@ -280,6 +348,8 @@ void StratumServer::handleMiningSubmit(int clientSocket, const Json::Value &reqI
     std::string nonce = params[4].asString();
 
     std::cout << "Worker " << workerName << " submitted result for job " << jobId << std::endl;
+    TaskValidator validator;
+    bool valid = validator.validate(workerName, jobId, extraNonce, ntime, nonce);
 
     std::ostringstream oss;
     oss << R"({"id":)" << reqId.asInt() << R"(,"result":true,"error":null})";

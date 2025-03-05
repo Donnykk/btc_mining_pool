@@ -29,6 +29,7 @@ public:
     ~MinerManager();
     bool registerMiner(const std::string &username, const std::string &password, const std::string &address);
     bool connectMiner(const std::string &username, const std::string &password);
+    bool disconnectMiner(const std::string &username);
 
 private:
     std::unordered_map<std::string, Miner> miners_;
@@ -51,6 +52,8 @@ protected:
     void handleClient(int clientSocket) override;
 
 private:
+    MinerManager minerManager;
+
     // Process a received Stratum message
     void processStratumMessage(int clientSocket, const std::string &message);
 
