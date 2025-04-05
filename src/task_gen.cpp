@@ -60,7 +60,7 @@ bool TaskGenerator::initDatabase()
 }
 
 TaskGenerator::TaskGenerator(const std::string &brokers, const std::string &topic)
-    : kafkaServer_(brokers, topic)
+    : kafkaServer_(brokers, topic), isListening_(false)
 {
     // Set up database
     std::string dbPath = "mining_pool.db";
@@ -165,4 +165,60 @@ bool TaskGenerator::storeTask(const std::string &jobId,
 void TaskGenerator::pushMiningTask(const std::string &task)
 {
     kafkaServer_.sendMessage(task);
+}
+
+bool TaskGenerator::startBlockListener(const std::string &blockTopic)
+{
+    if (isListening_)
+    {
+        return true;
+    }
+
+    auto messageCallback = [this](const std::string &message)
+    {
+        Json::Value root;
+        Json::Reader reader;
+
+        if (reader.parse(message, root))
+        {
+            try
+            {
+                std::string previousHash = root["hash"].asString();
+                double difficulty = root["difficulty"].asDouble();
+
+                if (newBlockCallback_)
+                {
+                    newBlockCallback_(previousHash, difficulty);
+                }
+
+                // 生成并推送新的挖矿任务
+                std::string newTask = generateTask(previousHash, difficulty);
+                pushMiningTask(newTask);
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Error processing block message: " << e.what() << std::endl;
+                return;
+            }
+        }
+    };
+
+    // 启动 Kafka 消费者
+    if (!kafkaServer_.setupConsumer(blockTopic))
+    {
+        std::cerr << "Failed to setup block listener" << std::endl;
+        return false;
+    }
+
+    isListening_ = true;
+    return true;
+}
+
+void TaskGenerator::stopBlockListener()
+{
+}
+
+void TaskGenerator::setNewBlockCallback(std::function<void(const std::string &, double)> callback)
+{
+    newBlockCallback_ = callback;
 }

@@ -9,7 +9,8 @@
                 "/opt/homebrew/opt/librdkafka/include",
                 "/opt/homebrew/opt/glog/include",
                 "/opt/homebrew/opt/gflags/include",
-                "/opt/homebrew/opt/mysql/include"
+                "/opt/homebrew/opt/mysql/include",
+                "${workspaceFolder}/src/BTCNode"
             ],
             "defines": [],
             "macFrameworkPath": [

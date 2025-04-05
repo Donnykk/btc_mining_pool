@@ -1,0 +1,11 @@
+[INFO] Database opened successfully!
+[INFO] Polling blockchain data...
+[DEBUG] Request method: getbestblockhash
+[DEBUG] Request params: 
+[DEBUG] Using URL: https://go.getblock.io/fac1ed1394ed48e7b09e81bf7ddd4f86
+[DEBUG] Sending RPC request: {
+	"id" : "btc-node",
+	"jsonrpc" : "2.0",
+	"method" : "getbestblockhash",
+	"params" : []
+}

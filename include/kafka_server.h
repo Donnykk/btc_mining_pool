@@ -17,7 +17,7 @@ public:
     void sendMessage(const std::string &message);
 
     // Kafka consumer
-    bool setupConsumer(int64_t offset = RD_KAFKA_OFFSET_END);
+    bool setupConsumer(const std::string &topic); // 移除了 KafkaServer:: 前缀
     std::string consumeMessage(int timeoutMs = 1000);
 
     // Utility

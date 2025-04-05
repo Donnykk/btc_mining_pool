@@ -5,8 +5,17 @@
 KafkaServer::KafkaServer(const std::string &brokers, const std::string &topic)
     : brokers_(brokers), topic_(topic), producer_(nullptr), consumer_(nullptr), kafkaTopic_(nullptr)
 {
+    // 创建新的配置
     globalConf_ = rd_kafka_conf_new();
     topicConf_ = rd_kafka_topic_conf_new();
+
+    // 设置 bootstrap.servers 配置项
+    char errstr[512];
+    if (rd_kafka_conf_set(globalConf_, "bootstrap.servers", brokers_.c_str(),
+                          errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK)
+    {
+        LOG(ERROR) << "Failed to set bootstrap.servers: " << errstr;
+    }
 }
 
 KafkaServer::~KafkaServer()
@@ -32,18 +41,26 @@ KafkaServer::~KafkaServer()
 bool KafkaServer::setupProducer()
 {
     char errstr[512];
-    producer_ = rd_kafka_new(RD_KAFKA_PRODUCER, globalConf_, errstr, sizeof(errstr));
+
+    // 创建生产者
+    rd_kafka_conf_t *conf = rd_kafka_conf_dup(globalConf_);
+    producer_ = rd_kafka_new(RD_KAFKA_PRODUCER, conf, errstr, sizeof(errstr));
     if (!producer_)
     {
         LOG(ERROR) << "Failed to create producer: " << errstr;
         return false;
     }
-    if (rd_kafka_brokers_add(producer_, brokers_.c_str()) == 0)
+
+    // bootstrap.servers 已在构造函数中设置，不再需要 rd_kafka_brokers_add
+
+    // 创建主题
+    kafkaTopic_ = rd_kafka_topic_new(producer_, topic_.c_str(), topicConf_);
+    if (!kafkaTopic_)
     {
-        LOG(ERROR) << "Failed to add brokers: " << brokers_;
+        LOG(ERROR) << "Failed to create topic: " << rd_kafka_err2str(rd_kafka_last_error());
         return false;
     }
-    kafkaTopic_ = rd_kafka_topic_new(producer_, topic_.c_str(), topicConf_);
+
     return true;
 }
 
@@ -70,37 +87,75 @@ void KafkaServer::sendMessage(const std::string &message)
     rd_kafka_poll(producer_, 0); // Handle delivery reports
 }
 
-bool KafkaServer::setupConsumer(int64_t offset)
+bool KafkaServer::setupConsumer(const std::string &topic)
 {
     char errstr[512];
-    rd_kafka_conf_set(globalConf_, "group.id", "mining_pool_group", errstr, sizeof(errstr));
-    rd_kafka_conf_set(globalConf_, "auto.offset.reset", "earliest", nullptr, 0);
 
-    consumer_ = rd_kafka_new(RD_KAFKA_CONSUMER, globalConf_, errstr, sizeof(errstr));
+    // 复制全局配置，因为我们需要添加消费者特定的配置
+    rd_kafka_conf_t *conf = rd_kafka_conf_dup(globalConf_);
+    if (!conf)
+    {
+        LOG(ERROR) << "Failed to duplicate config";
+        return false;
+    }
+
+    // 设置必要的消费者配置
+    const char *config_pairs[] = {
+        "group.id", "mining_pool_group",
+        "auto.offset.reset", "earliest",
+        "enable.auto.commit", "true",
+        "session.timeout.ms", "6000"};
+
+    for (size_t i = 0; i < sizeof(config_pairs) / sizeof(*config_pairs); i += 2)
+    {
+        if (rd_kafka_conf_set(conf, config_pairs[i], config_pairs[i + 1],
+                              errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK)
+        {
+            LOG(ERROR) << "Failed to set " << config_pairs[i] << ": " << errstr;
+            rd_kafka_conf_destroy(conf);
+            return false;
+        }
+    }
+
+    // 创建消费者
+    consumer_ = rd_kafka_new(RD_KAFKA_CONSUMER, conf, errstr, sizeof(errstr));
     if (!consumer_)
     {
         LOG(ERROR) << "Failed to create consumer: " << errstr;
+        rd_kafka_conf_destroy(conf);
         return false;
     }
 
-    if (rd_kafka_brokers_add(consumer_, brokers_.c_str()) == 0)
-    {
-        LOG(ERROR) << "Failed to add brokers: " << brokers_;
-        return false;
-    }
-
+    // 配置消费者
     rd_kafka_poll_set_consumer(consumer_);
 
+    // 订阅主题
     rd_kafka_topic_partition_list_t *topics = rd_kafka_topic_partition_list_new(1);
-    rd_kafka_topic_partition_list_add(topics, topic_.c_str(), RD_KAFKA_PARTITION_UA);
+    rd_kafka_topic_partition_list_add(topics, topic.c_str(), RD_KAFKA_PARTITION_UA);
 
-    if (rd_kafka_subscribe(consumer_, topics))
+    rd_kafka_resp_err_t err = rd_kafka_subscribe(consumer_, topics);
+    if (err != RD_KAFKA_RESP_ERR_NO_ERROR)
     {
-        LOG(ERROR) << "Failed to subscribe to topic: " << topic_;
+        LOG(ERROR) << "Failed to subscribe to topic: " << topic
+                   << ", error: " << rd_kafka_err2str(err);
+        rd_kafka_topic_partition_list_destroy(topics);
+        rd_kafka_destroy(consumer_);
+        consumer_ = nullptr;
         return false;
     }
 
     rd_kafka_topic_partition_list_destroy(topics);
+
+    // 检查连接状态
+    if (!checkConnection())
+    {
+        LOG(ERROR) << "Failed to establish connection to Kafka";
+        rd_kafka_destroy(consumer_);
+        consumer_ = nullptr;
+        return false;
+    }
+
+    LOG(INFO) << "Successfully set up consumer for topic: " << topic;
     return true;
 }
 
@@ -138,5 +193,20 @@ bool KafkaServer::checkConnection()
     {
         return false;
     }
-    return rd_kafka_brokers_add(producer_ ? producer_ : consumer_, brokers_.c_str()) > 0;
+
+    rd_kafka_t *handle = producer_ ? producer_ : consumer_;
+
+    // 获取元数据来检查连接
+    const struct rd_kafka_metadata *metadata;
+    rd_kafka_resp_err_t err = rd_kafka_metadata(
+        handle, 0, nullptr, &metadata, 5000);
+
+    if (err != RD_KAFKA_RESP_ERR_NO_ERROR)
+    {
+        LOG(ERROR) << "Failed to get metadata: " << rd_kafka_err2str(err);
+        return false;
+    }
+
+    rd_kafka_metadata_destroy(metadata);
+    return true;
 }

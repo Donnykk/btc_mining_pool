@@ -7,7 +7,7 @@ CXXFLAGS = -std=c++14 -g \
 		-I/opt/homebrew/opt/glog/include \
 		-I/opt/homebrew/opt/gflags/include \
 		-I/opt/homebrew/opt/mysql/include \
-		-I./src
+		-I./include
 
 LDFLAGS = -L/opt/homebrew/opt/jsoncpp/lib \
 		-L/opt/homebrew/opt/openssl/lib \
