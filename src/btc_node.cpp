@@ -55,29 +55,18 @@ std::string BTC_Node::sendJsonRpcRequest(const std::string &method, const std::v
         requestJson["jsonrpc"] = "2.0";
         requestJson["id"] = "btc-node";
         requestJson["method"] = method;
-
-        // 参数处理
         requestJson["params"] = Json::Value(Json::arrayValue);
         for (const auto &param : params)
         {
-            if (std::all_of(param.begin(), param.end(), ::isdigit)) // 仅包含数字的情况
+            if (std::all_of(param.begin(), param.end(), ::isdigit))
             {
-                requestJson["params"].append(std::stoi(param)); // 转换为整数
+                requestJson["params"].append(std::stoi(param));
             }
             else
             {
                 requestJson["params"].append(param);
             }
         }
-
-        // 添加调试日志
-        std::cout << "[DEBUG] Request method: " << method << std::endl;
-        std::cout << "[DEBUG] Request params: ";
-        for (const auto &param : params)
-        {
-            std::cout << param << " ";
-        }
-        std::cout << std::endl;
 
         Json::StreamWriterBuilder writer;
         std::string payload = Json::writeString(writer, requestJson);
@@ -99,7 +88,7 @@ std::string BTC_Node::sendJsonRpcRequest(const std::string &method, const std::v
         }
 
         std::string url = "https://go.getblock.io/" + api_key;
-        std::cout << "[DEBUG] Using URL: " << url << std::endl;
+        //std::cout << "[DEBUG] Using URL: " << url << std::endl;
 
         // CURL 设置
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -108,7 +97,7 @@ std::string BTC_Node::sendJsonRpcRequest(const std::string &method, const std::v
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
-        std::cout << "[DEBUG] Sending RPC request: " << payload << std::endl;
+        //std::cout << "[DEBUG] Sending RPC request: " << payload << std::endl;
 
         CURLcode res = curl_easy_perform(curl);
 
@@ -142,21 +131,20 @@ std::string BTC_Node::sendJsonRpcRequest(const std::string &method, const std::v
 
 void BTC_Node::parseBlockInfo(const std::string &response)
 {
-    std::cout << response << std::endl;
     Json::Value jsonData;
     Json::CharReaderBuilder reader;
     std::string errs;
     std::istringstream stream(response);
     if (!Json::parseFromStream(reader, stream, &jsonData, &errs))
     {
-        std::cerr << "[ERROR] Failed to parse JSON response: " << errs << std::endl;
+        std::cerr << "[ERROR] Failed to parse JSON response" << std::endl;
         return;
     }
 
     Json::Value result = jsonData["result"];
     if (result.isNull())
     {
-        std::cerr << "[ERROR] Invalid JSON-RPC response: missing 'result' field" << std::endl;
+        std::cerr << "[ERROR] Invalid JSON-RPC response" << std::endl;
         return;
     }
 
@@ -166,12 +154,10 @@ void BTC_Node::parseBlockInfo(const std::string &response)
     target = result["target"].asString();
     timestamp = result["time"].asUInt();
 
-    std::cout << "[INFO] Block Info Parsed - Height: " << blockHeight
-              << ", Hash: " << bestBlockHash
-              << ", Difficulty: " << difficulty
-              << ", Target: " << target
-              << ", Timestamp: " << timestamp << std::endl;
+    // 简化区块信息输出
+    std::cout << "[INFO] New Block - Height: " << blockHeight << ", Hash: " << bestBlockHash << std::endl;
 
+    // 静默处理交易列表
     transactions.clear();
     for (const auto &tx : result["tx"])
     {
@@ -251,12 +237,10 @@ void BTC_Node::startPoll(int intervalSeconds)
 {
     while (true)
     {
-        std::cout << "[INFO] Polling blockchain data..." << std::endl;
-
         std::string latestBlockHashResponse = sendJsonRpcRequest("getbestblockhash", {});
         if (latestBlockHashResponse.empty())
         {
-            std::cerr << "[ERROR] Failed to retrieve latest block hash!" << std::endl;
+            std::cerr << "[ERROR] Failed to retrieve latest block hash" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
             continue;
         }
@@ -283,13 +267,10 @@ void BTC_Node::startPoll(int intervalSeconds)
 
         // request block data
         std::string blockData = sendJsonRpcRequest("getblock", {latestBlockHash, "2"});
-        if (blockData.empty())
+        if (!blockData.empty())
         {
-            std::cerr << "[ERROR] Failed to retrieve block data!" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
-            continue;
+            parseBlockInfo(blockData);
         }
-        parseBlockInfo(blockData);
         std::this_thread::sleep_for(std::chrono::seconds(intervalSeconds));
     }
 }

@@ -30,7 +30,7 @@ int main()
     // 初始化 Task Generator
     const std::string brokers = "localhost:9092";
     const std::string taskTopic = "mining_tasks";
-    const std::string blockTopic = "new_blocks";
+    const std::string blockTopic = "BTC_blocks";
 
     std::cout << "正在连接 Kafka 服务器: " << brokers << std::endl;
 
@@ -47,7 +47,7 @@ int main()
 
         // 启动 BTC Node
         BTC_Node btc_node;
-        int pollInterval = 10;
+        int pollInterval = 60;
         std::thread pollThread(&BTC_Node::startPoll, &btc_node, pollInterval);
         pollThread.detach();
         std::cout << "BTC Node Polling thread started!" << std::endl;

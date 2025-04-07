@@ -174,41 +174,55 @@ bool TaskGenerator::startBlockListener(const std::string &blockTopic)
         return true;
     }
 
+    std::cout << "Starting block listener for topic: " << blockTopic << std::endl;
+
     auto messageCallback = [this](const std::string &message)
     {
+        std::cout << "Received message from Kafka: " << message << std::endl;
+        
         Json::Value root;
-        Json::Reader reader;
-
-        if (reader.parse(message, root))
+        Json::CharReaderBuilder reader;
+        std::string errs;
+        std::istringstream stream(message);
+        
+        if (!Json::parseFromStream(reader, stream, &root, &errs))
         {
-            try
-            {
-                std::string previousHash = root["hash"].asString();
-                double difficulty = root["difficulty"].asDouble();
+            std::cerr << "Error parsing JSON: " << errs << std::endl;
+            return;
+        }
 
-                if (newBlockCallback_)
-                {
-                    newBlockCallback_(previousHash, difficulty);
-                }
+        try
+        {
+            std::string previousHash = root["hash"].asString();
+            double difficulty = root["difficulty"].asDouble();
+            
+            std::cout << "Parsed block info - Hash: " << previousHash << ", Difficulty: " << difficulty << std::endl;
 
-                // 生成并推送新的挖矿任务
-                std::string newTask = generateTask(previousHash, difficulty);
-                pushMiningTask(newTask);
-            }
-            catch (const std::exception &e)
+            if (newBlockCallback_)
             {
-                std::cerr << "Error processing block message: " << e.what() << std::endl;
-                return;
+                newBlockCallback_(previousHash, difficulty);
             }
+
+            // 生成并推送新的挖矿任务
+            std::string newTask = generateTask(previousHash, difficulty);
+            pushMiningTask(newTask);
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Error processing block message: " << e.what() << std::endl;
+            return;
         }
     };
 
-    // 启动 Kafka 消费者
+    // 启动 Kafka 消费者，确保从最新消息开始消费
     if (!kafkaServer_.setupConsumer(blockTopic))
     {
         std::cerr << "Failed to setup block listener" << std::endl;
         return false;
     }
+    
+    // 设置消息回调
+    kafkaServer_.setMessageCallback(messageCallback);
 
     isListening_ = true;
     return true;
@@ -216,6 +230,12 @@ bool TaskGenerator::startBlockListener(const std::string &blockTopic)
 
 void TaskGenerator::stopBlockListener()
 {
+    if (isListening_)
+    {
+        kafkaServer_.stopConsumer();
+        isListening_ = false;
+        std::cout << "区块监听器已停止" << std::endl;
+    }
 }
 
 void TaskGenerator::setNewBlockCallback(std::function<void(const std::string &, double)> callback)
