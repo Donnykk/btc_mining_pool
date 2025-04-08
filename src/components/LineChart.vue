@@ -1,34 +1,112 @@
 <template>
-    <div ref="chart" class="w-full h-64"></div>
+  <div ref="chartContainer" class="chart-container"></div>
 </template>
 
 <script>
-import { ref, onMounted, watch } from "vue";
-import * as echarts from "echarts";
+import { ref, onMounted, watch } from 'vue'
+import * as echarts from 'echarts'
 
 export default {
-    props: ["data"],
-    setup(props) {
-        const chart = ref(null);
-        let chartInstance = null;
+  name: 'LineChart',
+  props: {
+    data: {
+      type: Array,
+      required: true
+    }
+  },
+  setup(props) {
+    const chartContainer = ref(null)
+    let chart = null
 
-        onMounted(() => {
-            chartInstance = echarts.init(chart.value);
-            updateChart();
-        });
+    const initChart = () => {
+      if (!chartContainer.value) return
+      
+      chart = echarts.init(chartContainer.value)
+      
+      const option = {
+        grid: {
+          top: 40,
+          right: 20,
+          bottom: 40,
+          left: 60,
+          containLabel: true
+        },
+        tooltip: {
+          trigger: 'axis'
+        },
+        xAxis: {
+          type: 'category',
+          data: props.data.map(item => item.label),
+          axisLine: {
+            lineStyle: {
+              color: '#a0aec0'
+            }
+          }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: {
+            lineStyle: {
+              color: '#a0aec0'
+            }
+          },
+          splitLine: {
+            lineStyle: {
+              color: 'rgba(160, 174, 192, 0.1)'
+            }
+          }
+        },
+        series: [{
+          data: props.data.map(item => item.value),
+          type: 'line',
+          smooth: true,
+          symbolSize: 8,
+          lineStyle: {
+            width: 3,
+            color: '#4299e1'
+          },
+          itemStyle: {
+            color: '#4299e1'
+          },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              {
+                offset: 0,
+                color: 'rgba(66, 153, 225, 0.3)'
+              },
+              {
+                offset: 1,
+                color: 'rgba(66, 153, 225, 0.1)'
+              }
+            ])
+          }
+        }]
+      }
+      
+      chart.setOption(option)
+    }
 
-        const updateChart = () => {
-            if (!chartInstance || !props.data.length) return;
-            chartInstance.setOption({
-                xAxis: { type: "category", data: props.data.map((d) => d.time) },
-                yAxis: { type: "value" },
-                series: [{ data: props.data.map((d) => d.hashrate), type: "line" }],
-            });
-        };
+    watch(() => props.data, () => {
+      initChart()
+    }, { deep: true })
 
-        watch(() => props.data, updateChart, { deep: true });
+    onMounted(() => {
+      initChart()
+      window.addEventListener('resize', () => {
+        chart && chart.resize()
+      })
+    })
 
-        return { chart };
-    },
-};
+    return {
+      chartContainer
+    }
+  }
+}
 </script>
+
+<style scoped>
+.chart-container {
+  width: 100%;
+  height: 100%;  /* Take full height of parent */
+}
+</style>
