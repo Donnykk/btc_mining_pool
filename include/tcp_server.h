@@ -40,5 +40,4 @@ protected:
     void sendMessage(int clientSocket, const std::string &message);
     std::string receiveMessage(int clientSocket);
 };
-
 #endif // TCPSERVER_H

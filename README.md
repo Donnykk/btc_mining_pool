@@ -33,3 +33,6 @@ Run:
 ```bash
 make run
 ```
+
+TEST:
+`cpuminer-opt` is Recommended
