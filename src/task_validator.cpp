@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <openssl/sha.h>
 #include <iostream>
+#include <ctime>
 
 TaskValidator::TaskValidator()
 {
@@ -23,6 +24,9 @@ bool TaskValidator::validate(const std::string &workerName,
 {
     std::string hash = calculateHash(extraNonce, ntime, nonce);
     std::string target;
+    bool isValid = false;
+
+    // 获取任务目标值
     sqlite3_stmt *stmt = nullptr;
     const char *query = "SELECT Target FROM Job WHERE JobId = ?;";
     if (sqlite3_prepare_v2(db_, query, -1, &stmt, nullptr) == SQLITE_OK)
@@ -39,7 +43,27 @@ bool TaskValidator::validate(const std::string &workerName,
         std::cerr << "Failed to prepare select statement: " << sqlite3_errmsg(db_) << std::endl;
         return false;
     }
-    return hash < target;
+
+    isValid = hash < target;
+
+    // 记录share
+    const char* insertShare = 
+        "INSERT INTO Share (Username, JobId, IsValid, Difficulty) "
+        "VALUES (?, ?, ?, ?);";
+    
+    if (sqlite3_prepare_v2(db_, insertShare, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, workerName.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, jobId.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 3, isValid ? 1 : 0);
+        sqlite3_bind_text(stmt, 4, target.c_str(), -1, SQLITE_STATIC);
+        
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Failed to insert share: " << sqlite3_errmsg(db_) << std::endl;
+        }
+        sqlite3_finalize(stmt);
+    }
+
+    return isValid;
 }
 
 std::string TaskValidator::calculateHash(const std::string &extraNonce, const std::string &ntime, const std::string &nonce)

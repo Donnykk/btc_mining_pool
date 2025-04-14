@@ -3,20 +3,17 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/**",
-                "/opt/homebrew/opt/openssl/include",
-                "/opt/homebrew/opt/jsoncpp/include",
-                "/opt/homebrew/opt/librdkafka/include",
-                "/opt/homebrew/opt/glog/include",
-                "/opt/homebrew/opt/gflags/include",
-                "/opt/homebrew/opt/mysql/include",
-                "${workspaceFolder}/src/BTCNode"
+                "${workspaceFolder}/include",
+                "/opt/homebrew/include",
+                "/opt/homebrew/Cellar/librdkafka/2.8.0/include",
+                "/opt/homebrew/Cellar/sqlite/3.49.1/include",
+                "/opt/homebrew/Cellar/jsoncpp/1.9.6/include"
             ],
             "defines": [],
             "macFrameworkPath": [
                 "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
             ],
-            "compilerPath": "/usr/bin/clang",
+            "compilerPath": "/usr/bin/clang++",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "macos-clang-arm64"

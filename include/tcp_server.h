@@ -1,43 +1,66 @@
-#ifndef TCPSERVER_H
-#define TCPSERVER_H
+#pragma once
 
 #include <string>
 #include <vector>
 #include <thread>
-#include <atomic>
-#include <unordered_set>
-#include <netinet/in.h>
-#include <mysql/mysql.h>
+#include <functional>
+#include <map>
 #include <sqlite3.h>
+#include <json/json.h>
+#include <sstream>
+
+// HTTP请求结构
+struct HttpRequest
+{
+    std::string method;
+    std::string path;
+    std::map<std::string, std::string> headers;
+    std::map<std::string, std::string> parameters;
+    std::string body;
+
+    std::string getParameter(const std::string &name, const std::string &defaultValue = "") const;
+};
+
+// HTTP响应结构
+struct HttpResponse
+{
+    int status = 200;
+    std::map<std::string, std::string> headers;
+    std::string content;
+
+    void setStatus(int code);
+    void setContent(const std::string &data);
+};
 
 class TCPServer
 {
 public:
     TCPServer(int port);
-    ~TCPServer();
+    virtual ~TCPServer();
 
-    bool start();
-    void stop();
+    virtual bool start();
+    virtual void stop();
 
 protected:
-    int serverSocket_;
-    int port_;
-
-    std::atomic<bool> isRunning_;
-    std::vector<std::thread> clientThreads_;
-    std::mutex clientMutex_;
-    std::unordered_set<int> clientSockets_;
-
-    // database configure
-    std::string dbHost = "localhost";
-    std::string dbUser = "root";
-    std::string dbPassword = "root";
-    std::string dbName = "Mining_Pool";
-    std::string dbPath = "mining_pool.db";
-
     virtual void handleClient(int clientSocket);
+    virtual void sendMessage(int clientSocket, const std::string &message);
+    virtual std::string receiveMessage(int clientSocket);
 
-    void sendMessage(int clientSocket, const std::string &message);
-    std::string receiveMessage(int clientSocket);
+    // HTTP 请求处理
+    virtual bool isHttpRequest(const std::string &message);
+    virtual HttpRequest parseHttpRequest(const std::string &message);
+    virtual std::string formatHttpResponse(const HttpResponse &response);
+    virtual void handleHttpRequest(int clientSocket, const HttpRequest &request);
+    virtual void handleNonHttpRequest(int clientSocket, const std::string &message);
+
+    // API 处理方法
+    virtual void handleMinersRequest(const HttpRequest &request, HttpResponse &response);
+
+    int port_;
+    int serverSocket_;
+    bool isRunning_;
+    std::vector<std::thread> clientThreads_;
+
+    // 数据库连接
+    sqlite3 *db_;
 };
-#endif // TCPSERVER_H

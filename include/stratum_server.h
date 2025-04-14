@@ -5,6 +5,7 @@
 #include "tcp_server.h"
 #include <string>
 #include <json/json.h>
+#include <unordered_set>
 
 class Miner
 {
@@ -53,6 +54,9 @@ protected:
 
 private:
     MinerManager minerManager;
+
+    std::mutex clientMutex_;
+    std::unordered_set<int> clientSockets_;
 
     // Process a received Stratum message
     void processStratumMessage(int clientSocket, const std::string &message);

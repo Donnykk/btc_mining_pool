@@ -27,15 +27,15 @@ int main()
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    // 初始化 Task Generator
-    const std::string brokers = "localhost:9092";
-    const std::string taskTopic = "mining_tasks";
-    const std::string blockTopic = "BTC_blocks";
-
-    std::cout << "正在连接 Kafka 服务器: " << brokers << std::endl;
-
     try
     {
+        const std::string brokers = "localhost:9092";
+        const std::string taskTopic = "mining_tasks";
+        const std::string blockTopic = "new_blocks";
+
+        std::cout << "正在连接 Kafka 服务器: " << brokers << std::endl;
+
+        // Task Generator
         TaskGenerator taskGen(brokers, taskTopic);
         g_taskGen = &taskGen;
         if (!taskGen.startBlockListener(blockTopic))
@@ -45,30 +45,41 @@ int main()
         }
         std::cout << "Task Generator started!" << std::endl;
 
-        // 启动 BTC Node
+        // BTC Node
         BTC_Node btc_node;
         int pollInterval = 60;
         std::thread pollThread(&BTC_Node::startPoll, &btc_node, pollInterval);
         pollThread.detach();
         std::cout << "BTC Node Polling thread started!" << std::endl;
 
-        // 启动 Stratum Server
-        // int port = 9090;
-        // StratumServer server(port);
-        // g_server = &server;
+        // 启动 Stratum Server (矿工连接)
+        int stratumPort = 3333;
+        StratumServer stratumServer(stratumPort);
+        g_server = &stratumServer;
 
-        // std::cout << "Start Stratum Server. Listening: " << port << std::endl;
-        // if (!server.start())
-        // {
-        //     std::cerr << "Failed to Start Server!" << std::endl;
-        //     return 1;
-        // }
+        // 启动 HTTP Server (API 查询)
+        int httpPort = 9090;
+        TCPServer httpServer(httpPort);
 
-        // 主线程等待
-        while (true)
-        {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
+        std::cout << "Starting Stratum Server on port " << stratumPort << std::endl;
+        std::cout << "Starting HTTP Server on port " << httpPort << std::endl;
+
+        // 启动两个服务器线程
+        std::thread stratumThread([&stratumServer]()
+                                  {
+            if (!stratumServer.start()) {
+                std::cerr << "Failed to start Stratum Server!" << std::endl;
+            } });
+
+        std::thread httpThread([&httpServer]()
+                               {
+            if (!httpServer.start()) {
+                std::cerr << "Failed to start HTTP Server!" << std::endl;
+            } });
+
+        // 等待线程结束
+        stratumThread.join();
+        httpThread.join();
     }
     catch (const std::exception &e)
     {
