@@ -100,45 +100,21 @@ void TCPServer::stop()
 
 void TCPServer::handleClient(int clientSocket)
 {
-    std::string message;
-    while (isRunning_)
+    std::string message = receiveMessage(clientSocket);
+    if (!message.empty())
     {
-        message = receiveMessage(clientSocket);
-        if (message.empty())
-        {
-            std::cout << "Client disconnected." << std::endl;
-            break;
-        }
-        std::cout << "Received message:\n"
+        std::cout << "Received request:\n"
                   << message << std::endl;
 
-        // 判断是否为 HTTP 请求
-        if (isHttpRequest(message))
-        {
-            std::cout << "Processing HTTP request..." << std::endl;
-            HttpRequest request = parseHttpRequest(message);
-            std::cout << "Method: " << request.method << ", Path: " << request.path << std::endl;
-            HttpResponse response;
+        HttpRequest request = parseHttpRequest(message);
+        std::cout << "Method: " << request.method << ", Path: " << request.path << std::endl;
 
-            // 处理 API 请求
-            handleHttpRequest(clientSocket, request);
-        }
-        else
-        {
-            // 处理普通 TCP 消息
-            std::cout << "Processing non-HTTP request..." << std::endl;
-            handleNonHttpRequest(clientSocket, message);
-        }
+        HttpResponse response;
+        handleHttpRequest(clientSocket, request);
     }
-    close(clientSocket);
-}
 
-bool TCPServer::isHttpRequest(const std::string &message)
-{
-    return (message.find("GET ") == 0 ||
-            message.find("POST ") == 0 ||
-            message.find("PUT ") == 0 ||
-            message.find("DELETE ") == 0);
+    close(clientSocket);
+    std::cout << "Client disconnected." << std::endl;
 }
 
 HttpRequest TCPServer::parseHttpRequest(const std::string &message)
@@ -173,7 +149,23 @@ void TCPServer::handleHttpRequest(int clientSocket, const HttpRequest &request)
 {
     HttpResponse response;
 
-    // 解析基本路径和查询参数
+    // 处理 OPTIONS 预检请求
+    if (request.method == "OPTIONS")
+    {
+        response.setStatus(200);
+        response.headers["Access-Control-Allow-Origin"] = "*";
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Accept";
+        response.headers["Access-Control-Max-Age"] = "86400";
+        response.headers["Content-Type"] = "text/plain";
+        response.setContent("");
+
+        std::string responseStr = formatHttpResponse(response);
+        sendMessage(clientSocket, responseStr);
+        return;
+    }
+
+    // 处理正常请求
     std::string path = request.path;
     if (request.method == "GET")
     {
@@ -209,26 +201,28 @@ std::string TCPServer::formatHttpResponse(const HttpResponse &response)
         oss << "Not Found";
     else if (response.status == 500)
         oss << "Internal Server Error";
+    else if (response.status == 400)
+        oss << "Bad Request";
 
     oss << "\r\n";
 
-    // 添加响应头
+    // 确保每个响应都有这些 CORS 头
+    oss << "Access-Control-Allow-Origin: *\r\n";
+    oss << "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
+    oss << "Access-Control-Allow-Headers: Content-Type, Accept\r\n";
+    oss << "Vary: Origin\r\n"; // 添加 Vary 头
+
+    // 添加其他响应头
     for (const auto &header : response.headers)
     {
         oss << header.first << ": " << header.second << "\r\n";
     }
 
+    oss << "Connection: keep-alive\r\n"; // 添加 Connection 头
     oss << "\r\n"
         << response.content;
 
     return oss.str();
-}
-
-void TCPServer::handleNonHttpRequest(int clientSocket, const std::string &message)
-{
-    // 处理普通 TCP 消息
-    std::cout << "Received message: " << message << std::endl;
-    sendMessage(clientSocket, "Message received: " + message);
 }
 
 void TCPServer::sendMessage(int clientSocket, const std::string &message)
@@ -272,7 +266,7 @@ void TCPServer::handleMinersRequest(const HttpRequest &request, HttpResponse &re
     }
 
     sqlite3_stmt *stmt = nullptr;
-    const char *sql = "SELECT Username, Address, Status, HashRate, TotalReward "
+    const char *sql = "SELECT Username, Address, Status, ValidShares, HashRate, TotalReward "
                       "FROM Miner WHERE Username = ?;";
 
     Json::Value result(Json::objectValue);
@@ -291,8 +285,9 @@ void TCPServer::handleMinersRequest(const HttpRequest &request, HttpResponse &re
         result["username"] = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
         result["address"] = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
         result["status"] = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
-        result["hashrate"] = sqlite3_column_double(stmt, 3);
-        result["totalreward"] = sqlite3_column_double(stmt, 4);
+        result["validshares"] = sqlite3_column_int(stmt, 3);
+        result["hashrate"] = sqlite3_column_double(stmt, 4);
+        result["totalreward"] = sqlite3_column_double(stmt, 5);
 
         response.setStatus(200);
         response.headers["Content-Type"] = "application/json";

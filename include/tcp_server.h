@@ -47,11 +47,9 @@ protected:
     virtual std::string receiveMessage(int clientSocket);
 
     // HTTP 请求处理
-    virtual bool isHttpRequest(const std::string &message);
     virtual HttpRequest parseHttpRequest(const std::string &message);
     virtual std::string formatHttpResponse(const HttpResponse &response);
     virtual void handleHttpRequest(int clientSocket, const HttpRequest &request);
-    virtual void handleNonHttpRequest(int clientSocket, const std::string &message);
 
     // API 处理方法
     virtual void handleMinersRequest(const HttpRequest &request, HttpResponse &response);
