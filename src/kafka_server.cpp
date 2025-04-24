@@ -16,7 +16,7 @@ KafkaServer::KafkaServer(const std::string &brokers, const std::string &topic)
     {
         LOG(ERROR) << "Failed to set bootstrap.servers: " << errstr;
     }
-}   
+}
 
 KafkaServer::~KafkaServer()
 {
@@ -81,7 +81,7 @@ void KafkaServer::sendMessage(const std::string &message)
     }
     else
     {
-        //LOG(INFO) << "Message sent: " << message;
+        // LOG(INFO) << "Message sent: " << message;
     }
 
     rd_kafka_poll(producer_, 0); // Handle delivery reports
@@ -213,29 +213,32 @@ bool KafkaServer::checkConnection()
 void KafkaServer::setMessageCallback(std::function<void(const std::string &)> callback)
 {
     messageCallback_ = callback;
-    
+
     // 启动消息处理线程
-    if (consumer_ && messageCallback_) {
-        if (consumerThread_.joinable()) {
+    if (consumer_ && messageCallback_)
+    {
+        if (consumerThread_.joinable())
+        {
             stopConsumer();
         }
-        
+
         isRunning_ = true;
-        consumerThread_ = std::thread([this]() {
+        consumerThread_ = std::thread([this]()
+                                      {
             while (isRunning_) {
                 std::string message = consumeMessage(100);
                 if (!message.empty() && messageCallback_) {
                     messageCallback_(message);
                 }
-            }
-        });
+            } });
     }
 }
 
 void KafkaServer::stopConsumer()
 {
     isRunning_ = false;
-    if (consumerThread_.joinable()) {
+    if (consumerThread_.joinable())
+    {
         consumerThread_.join();
     }
 }

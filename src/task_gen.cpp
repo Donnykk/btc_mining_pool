@@ -86,7 +86,40 @@ TaskGenerator::TaskGenerator(const std::string &brokers, const std::string &topi
 std::string TaskGenerator::generateCoinbaseTransaction()
 {
     std::ostringstream oss;
-    oss << "coinbase_tx_" << time(nullptr);
+
+    // 1. 交易版本号 (4 bytes)
+    oss << "01000000";
+
+    // 2. 输入数量 (1 byte)
+    oss << "01";
+
+    // 3. 输入
+    // 3.1 空的交易ID (32 bytes)
+    oss << "0000000000000000000000000000000000000000000000000000000000000000";
+    // 3.2 输出索引 (4 bytes)
+    oss << "ffffffff";
+
+    // 3.3 coinbase 脚本
+    std::string scriptSig = "03" + toHexString(time(nullptr), 32); // 只包含时间戳
+    oss << toHexString(scriptSig.length() / 2, 8) << scriptSig;
+
+    // 3.4 序列号 (4 bytes)
+    oss << "ffffffff";
+
+    // 4. 输出数量 (1 byte)
+    oss << "01";
+
+    // 5. 输出
+    // 5.1 比特币数量 (8 bytes) - 50 BTC in satoshis
+    oss << "0000e1f505000000";
+
+    // 5.2 输出脚本
+    std::string pubKeyScript = std::string("76a914") + "0000000000000000000000000000000000000000" + "88ac";
+    oss << toHexString(pubKeyScript.length() / 2, 8) << pubKeyScript;
+
+    // 6. 锁定时间 (4 bytes)
+    oss << "00000000";
+
     return oss.str();
 }
 
@@ -179,12 +212,12 @@ bool TaskGenerator::startBlockListener(const std::string &blockTopic)
     auto messageCallback = [this](const std::string &message)
     {
         std::cout << "Received message from Kafka: " << message << std::endl;
-        
+
         Json::Value root;
         Json::CharReaderBuilder reader;
         std::string errs;
         std::istringstream stream(message);
-        
+
         if (!Json::parseFromStream(reader, stream, &root, &errs))
         {
             std::cerr << "Error parsing JSON: " << errs << std::endl;
@@ -195,7 +228,7 @@ bool TaskGenerator::startBlockListener(const std::string &blockTopic)
         {
             std::string previousHash = root["hash"].asString();
             double difficulty = root["difficulty"].asDouble();
-            
+
             std::cout << "Parsed block info - Hash: " << previousHash << ", Difficulty: " << difficulty << std::endl;
 
             if (newBlockCallback_)
@@ -220,7 +253,7 @@ bool TaskGenerator::startBlockListener(const std::string &blockTopic)
         std::cerr << "Failed to setup block listener" << std::endl;
         return false;
     }
-    
+
     // 设置消息回调
     kafkaServer_.setMessageCallback(messageCallback);
 

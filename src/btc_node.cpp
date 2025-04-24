@@ -88,7 +88,7 @@ std::string BTC_Node::sendJsonRpcRequest(const std::string &method, const std::v
         }
 
         std::string url = "https://go.getblock.io/" + api_key;
-        //std::cout << "[DEBUG] Using URL: " << url << std::endl;
+        // std::cout << "[DEBUG] Using URL: " << url << std::endl;
 
         // CURL 设置
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -97,7 +97,7 @@ std::string BTC_Node::sendJsonRpcRequest(const std::string &method, const std::v
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
-        //std::cout << "[DEBUG] Sending RPC request: " << payload << std::endl;
+        // std::cout << "[DEBUG] Sending RPC request: " << payload << std::endl;
 
         CURLcode res = curl_easy_perform(curl);
 
@@ -154,7 +154,6 @@ void BTC_Node::parseBlockInfo(const std::string &response)
     target = result["target"].asString();
     timestamp = result["time"].asUInt();
 
-    // 简化区块信息输出
     std::cout << "[INFO] New Block - Height: " << blockHeight << ", Hash: " << bestBlockHash << std::endl;
 
     // 静默处理交易列表

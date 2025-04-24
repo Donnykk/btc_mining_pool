@@ -2,6 +2,7 @@
 #include "stratum_server.h"
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 #include <mutex>
 #include <unistd.h>
 #include <unordered_set>
@@ -331,12 +332,119 @@ void StratumServer::handleMiningExtranonceSubscribe(int clientSocket, const Json
     handleMiningNotify(clientSocket);
 }
 
+std::string targetToNBits(const std::string &target)
+{
+    // 去除前导零
+    size_t firstNonZero = target.find_first_not_of('0');
+    if (firstNonZero == std::string::npos)
+    {
+        return "1d00ffff";
+    }
+
+    // 计算有效位数
+    std::string effectiveTarget = target.substr(firstNonZero);
+
+    // 计算指数（第一个字节）
+    int exponent = (target.length() - firstNonZero) / 2;
+
+    // 取前6个有效字符作为系数（3个字节）
+    std::string coefficient = effectiveTarget.substr(0, 6);
+    while (coefficient.length() < 6)
+    {
+        coefficient += "0";
+    }
+
+    // 组合成 nBits 格式（4字节，大端序）
+    std::stringstream ss;
+    ss << std::hex << std::setw(2) << std::setfill('0') << exponent;
+    ss << coefficient;
+
+    return ss.str();
+}
+
 void StratumServer::handleMiningNotify(int clientSocket)
 {
-    std::string notifyMessage = R"({"id":null,"method":"mining.notify","params":["B8rBfBgte","ca233f5e0d742ae5496c70bca70c29f2fc2e07f1000ccab20000000000000000","01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff64032fa4092cfabe6d6dc5cf100d10589275d705cb97a9bd1538a43aa3d80f79b2cef3df8bae83df9be910000000f09f909f082f4632506f6f6c2f104d696e656420627920676f61746269740000000000000000000000000000000000000005","046df52126000000001976a914c825a1ecf2a6830c4401620c3a16f1995057c2ab88ac00000000000000002f6a24aa21a9edd8b230477653c88496573b58cbaf3a3e9b94967780d2994711ca0351f84dbc3308000000000000000000000000000000002c6a4c2952534b424c4f434b3af8d08fcbbe5d9822db33f13c0eafd3a8346fd816d3a462790c1bbc23002479480000000000000000266a24b9e11b6dba3d0da4b316490cad28b9c143047d53fc9fffb5c6454aad22553bed229f604135512c3a",["cabe23c7b037fdc897f34263599c1955c81ea5eecac3e21b78f5d2b24433333b","b65a061b6b328db86fbba3bbe6fa229700a1bb3386325dff5e1da8abb011b670","1b18a0a020837e44ef5eb2ab72aa1a0fd02c89e5b92cde9efe727e72edee8065"],"20000000","171297f6","5ecdcf8a",true]})";
-    notifyMessage += "\n";
-    sendMessage(clientSocket, notifyMessage);
-    std::cout << "Send message: " << notifyMessage << std::endl;
+    sqlite3_stmt *stmt = nullptr;
+    const char *sql = "SELECT JobId, Coinbase, Merkle, PrevBlock, Target "
+                      "FROM Job WHERE Status = 'active' "
+                      "ORDER BY Timestamp DESC LIMIT 1;";
+
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK)
+    {
+        std::cerr << "\033[31m[ERROR]\033[0m Failed to prepare statement: "
+                  << sqlite3_errmsg(db_) << std::endl;
+        return;
+    }
+
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        std::string jobId = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+        std::string coinbase = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+        std::string merkle = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
+        std::string prevBlock = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 3));
+        std::string target = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 4));
+
+        // 计算 coinbase 分割点
+        size_t scriptStart =
+            8 +  // Version
+            2 +  // Input count
+            64 + // Previous transaction hash
+            8 +  // Previous output index
+            2;   // Script length
+
+        // coinbase2 开始位置
+        size_t scriptEnd = scriptStart +
+                           8 +  // Sequence
+                           2 +  // Output count
+                           16 + // Amount
+                           2 +  // Script length
+                           50 + // Output script
+                           8;   // Locktime
+
+        // 构造 merkle 分支数组字符串
+        std::string merkleArrayStr = "[";
+        std::istringstream merkleStream(merkle);
+        std::string hash;
+        bool first = true;
+        while (std::getline(merkleStream, hash, ','))
+        {
+            if (!hash.empty())
+            {
+                if (!first)
+                    merkleArrayStr += ",";
+                merkleArrayStr += "\"" + hash + "\"";
+                first = false;
+            }
+        }
+        merkleArrayStr += "]";
+
+        // 将 target 转换为 nBits 格式
+        std::string nBits = targetToNBits(target);
+
+        // 使用原始字符串构造完整的消息
+        std::ostringstream oss;
+        oss << R"({"id":null,"method":"mining.notify","params":[")"
+            << jobId << "\",\""
+            << prevBlock << "\",\""
+            << coinbase.substr(0, scriptStart) << "\",\"" // coinbase1
+            << coinbase.substr(scriptEnd) << "\","        // coinbase2
+            << merkleArrayStr << ",\""
+            << "20000000" << "\",\""
+            << nBits << "\",\""
+            << std::hex << time(nullptr) << "\","
+            << "true]}";
+
+        std::string message = oss.str() + "\n";
+
+        std::cout << "\033[32m[>]\033[0m Sending notify: " << message;
+        sendMessage(clientSocket, message);
+    }
+    else
+    {
+        std::cerr << "\033[31m[Error]\033[0m No active mining tasks found." << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
 }
 
 void StratumServer::handleMiningSubmit(int clientSocket, const Json::Value &reqId, const Json::Value &params)

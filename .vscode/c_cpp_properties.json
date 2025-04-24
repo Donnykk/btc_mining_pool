@@ -7,7 +7,8 @@
                 "/opt/homebrew/include",
                 "/opt/homebrew/Cellar/librdkafka/2.8.0/include",
                 "/opt/homebrew/Cellar/sqlite/3.49.1/include",
-                "/opt/homebrew/Cellar/jsoncpp/1.9.6/include"
+                "/opt/homebrew/Cellar/jsoncpp/1.9.6/include",
+                "${workspaceFolder}/include/utils"
             ],
             "defines": [],
             "macFrameworkPath": [

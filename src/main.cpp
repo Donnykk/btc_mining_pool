@@ -31,7 +31,7 @@ int main()
     {
         const std::string brokers = "localhost:9092";
         const std::string taskTopic = "mining_tasks";
-        const std::string blockTopic = "new_blocks";
+        const std::string blockTopic = "BTC_blocks";
 
         std::cout << "正在连接 Kafka 服务器: " << brokers << std::endl;
 

@@ -17,8 +17,6 @@ struct HttpRequest
     std::map<std::string, std::string> headers;
     std::map<std::string, std::string> parameters;
     std::string body;
-
-    std::string getParameter(const std::string &name, const std::string &defaultValue = "") const;
 };
 
 // HTTP响应结构
