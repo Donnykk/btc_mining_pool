@@ -46,6 +46,9 @@ public:
     StratumServer(int port);
     ~StratumServer();
 
+    void wait();
+    void stop() override;
+
     // Broadcast task to all connected miners
     void broadcastToMiners(const std::string &task);
 

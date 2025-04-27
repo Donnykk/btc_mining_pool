@@ -3,12 +3,21 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/include",
-                "/opt/homebrew/include",
-                "/opt/homebrew/Cellar/librdkafka/2.8.0/include",
-                "/opt/homebrew/Cellar/sqlite/3.49.1/include",
-                "/opt/homebrew/Cellar/jsoncpp/1.9.6/include",
-                "${workspaceFolder}/include/utils"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/src/btc_node/**",
+                "${workspaceFolder}/src/task_gen/**",
+                "${workspaceFolder}/src/stratum_server/**",
+                "${workspaceFolder}/src/tcp_server/**",
+                "${workspaceFolder}/src/block_gen/**",
+                "${workspaceFolder}/src/kafka_server/**",
+                "${workspaceFolder}/src/task_validator/**",
+                "${workspaceFolder}/src/utils/**",
+                "/opt/homebrew/opt/jsoncpp/include",
+                "/opt/homebrew/opt/openssl/include",
+                "/opt/homebrew/opt/librdkafka/include",
+                "/opt/homebrew/opt/glog/include",
+                "/opt/homebrew/opt/gflags/include",
+                "/opt/homebrew/opt/mysql/include"
             ],
             "defines": [],
             "macFrameworkPath": [
@@ -16,7 +25,7 @@
             ],
             "compilerPath": "/usr/bin/clang++",
             "cStandard": "c17",
-            "cppStandard": "c++17",
+            "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64"
         }
     ],

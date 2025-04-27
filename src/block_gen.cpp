@@ -85,8 +85,3 @@ std::string BlockHeader::toString() const
 
 // BlockGenerator constructor implementation
 BlockGenerator::BlockGenerator(const std::string &previousHash, const double difficulty) : previousHash(previousHash), difficulty(difficulty) {}
-
-// BlockGenerator method implementation
-// BlockHeader BlockGenerator::generateBlock()
-// {
-// }

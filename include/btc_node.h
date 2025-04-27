@@ -27,6 +27,8 @@ public:
     BTC_Node();
     ~BTC_Node();
 
+    bool running_ = true;
+
     // Send JSON-RPC request
     std::string sendJsonRpcRequest(const std::string &method, const std::vector<std::string> &params);
 
@@ -35,6 +37,8 @@ public:
 
     // Poll to get new blocks
     void startPoll(int intervalSeconds);
+
+    void stop() { running_ = false; }
 
     // Store block data into database
     bool storeBlockData();

@@ -211,7 +211,7 @@ bool TaskGenerator::startBlockListener(const std::string &blockTopic)
 
     auto messageCallback = [this](const std::string &message)
     {
-        std::cout << "Received message from Kafka: " << message << std::endl;
+        // std::cout << "Received message from Kafka: " << message << std::endl;
 
         Json::Value root;
         Json::CharReaderBuilder reader;
@@ -274,4 +274,60 @@ void TaskGenerator::stopBlockListener()
 void TaskGenerator::setNewBlockCallback(std::function<void(const std::string &, double)> callback)
 {
     newBlockCallback_ = callback;
+}
+
+TaskGenerator *g_taskGen = nullptr;
+
+void signalHandler(int signal)
+{
+    std::cout << "接收到信号: " << signal << ", 正在停止..." << std::endl;
+    if (g_taskGen)
+    {
+        g_taskGen->stopBlockListener();
+    }
+    exit(signal);
+}
+
+int main()
+{
+    // 注册信号处理
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+
+    try
+    {
+        // Kafka 配置
+        const std::string brokers = "localhost:9092";
+        const std::string taskTopic = "mining_tasks";
+        const std::string blockTopic = "BTC_blocks";
+
+        std::cout << "正在连接 Kafka 服务器: " << brokers << std::endl;
+
+        // 初始化任务生成器
+        TaskGenerator taskGen(brokers, taskTopic);
+        g_taskGen = &taskGen;
+
+        // 启动区块监听
+        if (!taskGen.startBlockListener(blockTopic))
+        {
+            std::cerr << "启动区块监听失败！" << std::endl;
+            return 1;
+        }
+        std::cout << "任务生成器启动成功！" << std::endl;
+        std::cout << "监听区块主题: " << blockTopic << std::endl;
+        std::cout << "发送任务主题: " << taskTopic << std::endl;
+
+        // 保持程序运行
+        while (true)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "任务生成器初始化失败: " << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
 }

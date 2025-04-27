@@ -7,8 +7,7 @@ CXXFLAGS = -std=c++14 -g \
         -I/opt/homebrew/opt/glog/include \
         -I/opt/homebrew/opt/gflags/include \
         -I/opt/homebrew/opt/mysql/include \
-        -I./include \
-		-I./include/utils
+        -I./include 
 
 LDFLAGS = -L/opt/homebrew/opt/jsoncpp/lib \
         -L/opt/homebrew/opt/openssl/lib \
@@ -18,37 +17,41 @@ LDFLAGS = -L/opt/homebrew/opt/jsoncpp/lib \
         -L/opt/homebrew/opt/mysql/lib \
         -ljsoncpp -lcurl -lssl -lcrypto -lrdkafka -lglog -lgflags -lmysqlclient -lsqlite3
 
-# 查找所有源文件和头文件
-SRCS = $(shell find src -name '*.cpp')
+TARGETS = btc_node task_gen usr_server stratum_server
 
-# 生成目标文件路径,保持目录结构
+SRCS = $(wildcard src/*.cpp)
 OBJS = $(patsubst src/%.cpp,obj/%.o,$(SRCS))
 
-# 确保构建目录存在
-OBJDIRS = $(sort $(dir $(OBJS)))
+# 每个可执行文件的主文件
+MAIN_SRCS = $(addprefix src/,$(addsuffix .cpp,$(TARGETS)))
+MAIN_OBJS = $(patsubst src/%.cpp,obj/%.o,$(MAIN_SRCS))
+BIN_TARGETS = $(addprefix bin/,$(TARGETS))
+COMMON_SRCS = block_gen.cpp kafka_server.cpp task_validator.cpp tcp_server.cpp
+COMMON_OBJS = $(addprefix obj/,$(COMMON_SRCS:.cpp=.o))
 
-# Target Executable
-TARGET = main
+all: mkdirs $(BIN_TARGETS)
 
-# Build Rules
-all: mkdirs $(TARGET)
-
-# 创建所需目录
 mkdirs:
-	@mkdir -p $(OBJDIRS)
-
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	@mkdir -p obj bin
 
 obj/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
-	@echo "Compiling $< to $@"
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Run the application
-run: $(TARGET)
-	./$(TARGET)
+bin/btc_node: obj/btc_node.o $(COMMON_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Clean Up
+bin/task_gen: obj/task_gen.o $(COMMON_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+bin/usr_server: obj/usr_server.o $(COMMON_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+bin/stratum_server: obj/stratum_server.o $(COMMON_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+
 clean:
-	rm -rf obj $(TARGET)
+	rm -rf obj bin
+
+.PHONY: all clean mkdirs

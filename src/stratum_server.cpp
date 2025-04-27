@@ -464,3 +464,67 @@ void StratumServer::handleMiningSubmit(int clientSocket, const Json::Value &reqI
     std::string response = oss.str() + "\n";
     sendMessage(clientSocket, response);
 }
+
+void StratumServer::wait()
+{
+    while (isRunning_)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
+
+void StratumServer::stop()
+{
+    isRunning_ = false;
+    TCPServer::stop();
+}
+
+StratumServer *g_server = nullptr;
+
+void signalHandler(int signal)
+{
+    std::cout << "\033[33m[信号]\033[0m 收到信号: " << signal << ", 正在停止服务..." << std::endl;
+    if (g_server)
+    {
+        g_server->stop();
+    }
+}
+
+int main()
+{
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+
+    try
+    {
+        int stratumPort = 3333;
+
+        std::cout << "\033[32m[启动]\033[0m Stratum 服务启动" << std::endl;
+        std::cout << "├── 监听端口: " << stratumPort << std::endl;
+        std::cout << "├── 数据库: mining_pool.db" << std::endl;
+        std::cout << "└── 等待矿工连接..." << std::endl;
+
+        // 初始化 Stratum 服务器
+        StratumServer stratumServer(stratumPort);
+        g_server = &stratumServer;
+
+        // 启动服务
+        if (!stratumServer.start())
+        {
+            std::cerr << "\033[31m[错误]\033[0m Stratum 服务启动失败" << std::endl;
+            return 1;
+        }
+
+        // 主线程等待服务停止
+        stratumServer.wait();
+
+        std::cout << "\033[32m[停止]\033[0m Stratum 服务已停止" << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "\033[31m[错误]\033[0m Stratum 服务初始化失败: " << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
+}

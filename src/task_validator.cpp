@@ -47,17 +47,19 @@ bool TaskValidator::validate(const std::string &workerName,
     isValid = hash < target;
 
     // 记录share
-    const char* insertShare = 
+    const char *insertShare =
         "INSERT INTO Share (Username, JobId, IsValid, Difficulty) "
         "VALUES (?, ?, ?, ?);";
-    
-    if (sqlite3_prepare_v2(db_, insertShare, -1, &stmt, nullptr) == SQLITE_OK) {
+
+    if (sqlite3_prepare_v2(db_, insertShare, -1, &stmt, nullptr) == SQLITE_OK)
+    {
         sqlite3_bind_text(stmt, 1, workerName.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 2, jobId.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_int(stmt, 3, isValid ? 1 : 0);
         sqlite3_bind_text(stmt, 4, target.c_str(), -1, SQLITE_STATIC);
-        
-        if (sqlite3_step(stmt) != SQLITE_DONE) {
+
+        if (sqlite3_step(stmt) != SQLITE_DONE)
+        {
             std::cerr << "Failed to insert share: " << sqlite3_errmsg(db_) << std::endl;
         }
         sqlite3_finalize(stmt);

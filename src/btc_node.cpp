@@ -4,7 +4,6 @@
 #include <thread>
 #include <chrono>
 #include <sqlite3.h>
-#include "ConfigManager.h"
 
 BTC_Node::BTC_Node()
 {
@@ -18,8 +17,6 @@ BTC_Node::BTC_Node()
         std::cout << "[INFO] Database opened successfully!" << std::endl;
     }
 
-    // 从配置文件获取 Kafka 配置
-    auto &config = ConfigManager::getInstance();
     std::string kafkaBrokers = "localhost:9092";
     std::string kafkaTopic = "BTC_blocks";
 
@@ -81,7 +78,7 @@ std::string BTC_Node::sendJsonRpcRequest(const std::string &method, const std::v
         struct curl_slist *headers = nullptr;
         headers = curl_slist_append(headers, "Content-Type: application/json");
 
-        std::string api_key = ConfigManager::getInstance().getValue("GETBLOCK_API_KEY");
+        std::string api_key = "c3851e87062b4804b6b7061b720d8786";
         if (api_key.empty())
         {
             throw std::runtime_error("GETBLOCK_API_KEY not found");
@@ -234,7 +231,7 @@ bool BTC_Node::storeBlockData()
 
 void BTC_Node::startPoll(int intervalSeconds)
 {
-    while (true)
+    while (running_)
     {
         std::string latestBlockHashResponse = sendJsonRpcRequest("getbestblockhash", {});
         if (latestBlockHashResponse.empty())
@@ -292,4 +289,42 @@ bool BTC_Node::initKafka(const std::string &brokers, const std::string &topic)
         std::cerr << "[ERROR] Failed to initialize Kafka: " << e.what() << std::endl;
         return false;
     }
+}
+
+BTC_Node *g_node = nullptr;
+
+void signalHandler(int signal)
+{
+    std::cout << "\033[33m[信号]\033[0m 收到信号: " << signal << ", 正在停止服务..." << std::endl;
+    g_node->running_ = false;
+    if (g_node)
+    {
+        g_node->stop();
+    }
+}
+
+int main()
+{
+    // 注册信号处理
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+
+    try
+    {
+        // 初始化 BTC Node
+        BTC_Node btc_node;
+        g_node = &btc_node;
+
+        int pollInterval = 60;
+        std::cout << "\033[32m[启动]\033[0m BTC Node 服务启动" << std::endl;
+        btc_node.startPoll(pollInterval);
+        std::cout << "\033[32m[停止]\033[0m BTC Node 服务已停止" << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "\033[31m[错误]\033[0m BTC Node 初始化失败: " << e.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
 }
